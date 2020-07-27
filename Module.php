@@ -157,7 +157,7 @@ class Module extends AbstractModule
                         $reciprocalValue->setProperty($reciprocalProperty);
                         $reciprocalValue->setType($resourceType);
                         $reciprocalValue->setValueResource($resource);
-                        $reciprocalValue->setIsPublic(true);
+                        $reciprocalValue->setIsPublic($this->isPublicProperty($resource, $reciprocalProperty));
                         $reciprocalValues->add($reciprocalValue);
                         $entityManager->persist($reciprocalValue);
                     }
@@ -280,6 +280,29 @@ class Module extends AbstractModule
                 'add' => $isNew,
             ];
         }
+    }
+
+    protected function isPublicProperty(Resource $resource, Property $property)
+    {
+        static $isPublicProperties = [];
+
+        $resourceTemplate = $resource->getResourceTemplate();
+        if (!$resourceTemplate) {
+            return true;
+        }
+
+        $resourceTemplateId = $resourceTemplate->getId();
+        $propertyId = $property->getId();
+        if (!isset($isPublicProperties[$resourceTemplateId][$propertyId])) {
+            foreach ($resourceTemplate->getResourceTemplateProperties() as $resourceTemplateProperty) {
+                if ($resourceTemplateProperty->getProperty()->getId() === $propertyId) {
+                    $isPublicProperties[$resourceTemplateId][$propertyId] = !$resourceTemplateProperty->getIsPrivate();
+                    break;
+                }
+            }
+        }
+
+        return $isPublicProperties[$resourceTemplateId][$propertyId];
     }
 
     /**
