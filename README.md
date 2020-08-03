@@ -2,8 +2,7 @@ Reciprocal (module for Omeka S)
 ===============================
 
 [Reciprocal] is a module for [Omeka S] that allows to update automatically the
-linked resources with the reciprocal value in the reciprocal property when a
-value of a resource is filled with a value with the data type "Omeka resource".
+linked resources with the reciprocal value in the reciprocal property.
 
 For example, when the property "Dublin Core : Is Part Of" of the item Alpha is
 filled with the value "item Beta", a value "item Alpha" is added to the item Beta
