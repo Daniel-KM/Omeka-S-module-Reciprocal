@@ -67,10 +67,10 @@ class Module extends AbstractModule
             return '';
         }
 
-        $organisations = $settings->get('reciprocal_reciprocities', []);
+        $setting = $settings->get('reciprocal_reciprocities', []);
         $value = '';
-        foreach ($organisations as $organisation => $url) {
-            $value .= $organisation . ' = ' . $url  . "\n";
+        foreach ($setting as $key => $val) {
+            $value .= $key . ' = ' . $val . "\n";
         }
         $data['reciprocal_reciprocities'] = $value;
 
@@ -194,7 +194,7 @@ class Module extends AbstractModule
         // TODO Store this list in a specific setting to avoid to rebuild it each time (keep the original settings too)?
         $this->reciprocityIds = [];
 
-        $reciprocities = $this->getServiceLocator()->get('Omeka\Settings')->get('manioc_reciprocities');
+        $reciprocities = $this->getServiceLocator()->get('Omeka\Settings')->get('reciprocal_reciprocities');
         if (empty($reciprocities)) {
             return false;
         }
