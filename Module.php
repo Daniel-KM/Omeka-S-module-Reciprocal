@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 namespace Reciprocal;
 
 if (!class_exists(\Generic\AbstractModule::class)) {
@@ -8,12 +8,12 @@ if (!class_exists(\Generic\AbstractModule::class)) {
 }
 
 use Generic\AbstractModule;
-use Omeka\Entity\Property;
-use Omeka\Entity\Resource;
-use Reciprocal\Form\ConfigForm;
 use Laminas\EventManager\Event;
 use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\View\Renderer\PhpRenderer;
+use Omeka\Entity\Property;
+use Omeka\Entity\Resource;
+use Reciprocal\Form\ConfigForm;
 
 class Module extends AbstractModule
 {
@@ -29,7 +29,7 @@ class Module extends AbstractModule
      */
     protected $reciprocalValueResourceIds = [];
 
-    public function attachListeners(SharedEventManagerInterface $sharedEventManager)
+    public function attachListeners(SharedEventManagerInterface $sharedEventManager): void
     {
         $adapters = [
             \Omeka\Api\Adapter\ItemAdapter::class,
@@ -84,7 +84,7 @@ class Module extends AbstractModule
     /**
      * @param Event $event
      */
-    public function handleApiResourcePre(Event $event)
+    public function handleApiResourcePre(Event $event): void
     {
         if (!$this->prepareReciprocityIds()) {
             return;
@@ -98,7 +98,7 @@ class Module extends AbstractModule
     /**
      * @param Event $event
      */
-    public function handleApiResourcePost(Event $event)
+    public function handleApiResourcePost(Event $event): void
     {
         // Add or remove reciprocal values for value resources.
         // The process takes care of: auto-referencement, duplicate value
@@ -223,7 +223,7 @@ class Module extends AbstractModule
      * @param Resource $resource
      * @param bool $isNew
      */
-    protected function prepareSpecifiedValuesResources(Resource $resource, $isNew)
+    protected function prepareSpecifiedValuesResources(Resource $resource, $isNew): void
     {
         // Avoid an infinite loop.
         static $processed = [];
