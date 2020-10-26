@@ -1,8 +1,8 @@
 <?php
 namespace Reciprocal\Form;
 
-use Zend\Form\Element;
-use Zend\Form\Form;
+use Laminas\Form\Element;
+use Laminas\Form\Form;
 
 class ConfigForm extends Form
 {
@@ -34,7 +34,7 @@ dcterms:relation = dcterms:relation
                 'required' => false,
                 'filters' => [
                     [
-                        'name' => \Zend\Filter\Callback::class,
+                        'name' => \Laminas\Filter\Callback::class,
                         'options' => [
                             'callback' => [$this, 'stringToKeyValues'],
                         ],
