@@ -330,9 +330,6 @@ class Module extends AbstractModule
             ->addOrderBy('property.id', 'asc')
             ->addGroupBy('property.id')
         ;
-        $stmt = $connection->executeQuery($qb);
-        // Fetch by key pair is not supported by doctrine 2.0.
-        $terms = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        return array_column($terms, 'term', 'id');
+        return $connection->executeQuery($qb)->fetchAllKeyValue();
     }
 }
