@@ -1,4 +1,5 @@
 <?php declare(strict_types=1);
+
 namespace Reciprocal;
 
 if (!class_exists(\Generic\AbstractModule::class)) {
@@ -117,7 +118,6 @@ class Module extends AbstractModule
          */
         $services = $this->getServiceLocator();
         $entityManager = $services->get('Omeka\EntityManager');
-        $propertyRepository = $entityManager->getRepository(\Omeka\Entity\Property::class);
         $resourceTypes = [
             // "Resource" is used to simplify checks.
             'resource' => 'resource',
@@ -136,10 +136,10 @@ class Module extends AbstractModule
         $toFlush = false;
         foreach ($this->reciprocalValueResourceIds[$resourceId] as $propertyId => $reciprocalResources) {
             $reciprocalPropertyId = $this->reciprocityIds[$propertyId];
-            $reciprocalProperty = $propertyRepository->find($reciprocalPropertyId);
-            foreach ($reciprocalResources as $process) {
+            $reciprocalProperty = $entityManager->getReference(\Omeka\Entity\Property::class, $reciprocalPropertyId);
+            foreach ($reciprocalResources as $reciprocalResourceId => $isNew) {
                 /** @var \Omeka\Entity\Resource $reciprocalResource */
-                $reciprocalResource = $process['rr'];
+                $reciprocalResource = $entityManager->getReference(\Omeka\Entity\Resource::class, $reciprocalResourceId);
                 $reciprocalValues = $reciprocalResource->getValues();
                 $existings = $reciprocalValues->filter(function ($value) use ($resource, $resourceType, $reciprocalPropertyId) {
                     $type = $value->getType();
@@ -147,7 +147,7 @@ class Module extends AbstractModule
                         && $value->getProperty()->getId() === $reciprocalPropertyId
                         && $value->getValueResource() === $resource;
                 });
-                if ($process['add']) {
+                if ($isNew) {
                     // Add the resource as a value in the reciprocal property of
                     // the reciprocal resource one time only.
                     if (!count($existings)) {
@@ -199,8 +199,8 @@ class Module extends AbstractModule
             return false;
         }
 
-        $propertyTermsByIds = $this->propertyTermsByIds();
-        $propertyIdsByTerms = array_flip($propertyTermsByIds);
+        $propertyIdsByTerms = $this->getPropertyIds();
+        $propertyTermsByIds = array_flip($propertyIdsByTerms);
 
         // Manage the case where some properties were removed.
         $reciprocities = array_intersect_key($reciprocities, $propertyIdsByTerms);
@@ -273,12 +273,11 @@ class Module extends AbstractModule
                 continue;
             }
             // The reciprocal resource id allows to manage duplicate values.
-            $this->reciprocalValueResourceIds[$resourceId][$propertyId][$reciprocalResource->getId()] = [
-                // Process is true (new value resource to append) or false (old
-                // value resource to delete).
-                'rr' => $reciprocalResource,
-                'add' => $isNew,
-            ];
+            // Process is true (new value resource to append) or false (old
+            // value resource to delete).
+            // The reciprocal resource cannot be stored here, because an issue
+            // may occur with entity manager flush/clear.
+            $this->reciprocalValueResourceIds[$resourceId][$propertyId][$reciprocalResource->getId()] = $isNew;
         }
     }
 
@@ -306,30 +305,24 @@ class Module extends AbstractModule
     }
 
     /**
-     * Get list of all property terms by id.
-     *
-     * @return \Omeka\Entity\ResourceClass|null
+     * Get list of all property ids by terms.
      */
-    protected function propertyTermsByIds()
+    protected function getPropertyIds(): array
     {
-        /** @var \Doctrine\DBAL\Connection $connection */
         $connection = $this->getServiceLocator()->get('Omeka\Connection');
         $qb = $connection->createQueryBuilder();
         $qb
-            ->select([
-                'DISTINCT property.id AS id',
-                "CONCAT(vocabulary.prefix, ':', property.local_name) AS term",
-                // Only the two first selects are needed, but some databases
-                // require "order by" or "group by" value to be in the select.
-                'vocabulary.id',
-                'property.id',
-            ])
+            ->select(
+                'DISTINCT CONCAT(vocabulary.prefix, ":", property.local_name) AS term',
+                'property.id AS id',
+                // Required with only_full_group_by.
+                'vocabulary.id'
+            )
             ->from('property', 'property')
             ->innerJoin('property', 'vocabulary', 'vocabulary', 'property.vocabulary_id = vocabulary.id')
             ->orderBy('vocabulary.id', 'asc')
             ->addOrderBy('property.id', 'asc')
-            ->addGroupBy('property.id')
         ;
-        return $connection->executeQuery($qb)->fetchAllKeyValue();
+        return array_map('intval', $connection->executeQuery($qb)->fetchAllKeyValue());
     }
 }
