@@ -87,7 +87,7 @@ altered, and that no provisions are either added or removed herefrom.
 Copyright
 ---------
 
-* Copyright Daniel Berthereau, 2020 (see [Daniel-KM] on GitLab)
+* Copyright Daniel Berthereau, 2020-2022 (see [Daniel-KM] on GitLab)
 
 These features are built for the future digital library [Manioc] of the
 Université des Antilles and Université de la Guyane, currently managed with
