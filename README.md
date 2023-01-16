@@ -16,6 +16,8 @@ reciprocal value is removed too.
 The list of the most common reciprocal properties is ready for the default
 ontologies and can be updated for any new ontology.
 
+Note that the module [Inverse Properties] has a similar aim, but works differently.
+
 
 Installation
 ------------
@@ -87,7 +89,7 @@ altered, and that no provisions are either added or removed herefrom.
 Copyright
 ---------
 
-* Copyright Daniel Berthereau, 2020-2022 (see [Daniel-KM] on GitLab)
+* Copyright Daniel Berthereau, 2020-2023 (see [Daniel-KM] on GitLab)
 
 These features are built for the future digital library [Manioc] of the
 Université des Antilles and Université de la Guyane, currently managed with
@@ -96,7 +98,8 @@ Université des Antilles and Université de la Guyane, currently managed with
 
 [Reciprocal]: https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal
 [Omeka S]: https://omeka.org/s
-[Installing a module]: http://dev.omeka.org/docs/s/user-manual/modules/#installing-modules
+[Inverse Properties]: https://github.com/omeka-s-modules/inverseproperties
+[Installing a module]: https://omeka.org/s/docs/user-manual/modules/#installing-modules
 [Generic]: https://gitlab.com/Daniel-KM/Omeka-S-module-Generic
 [Reciprocal.zip]: https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal/-/releases
 [module issues]: https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal/-/issues
