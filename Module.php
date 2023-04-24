@@ -90,6 +90,8 @@ class Module extends AbstractModule
         if (!$this->prepareReciprocityIds()) {
             return;
         }
+
+        /** @var \Omeka\Api\Request $request */
         $request = $event->getParam('request');
         $resource = $this->getServiceLocator()->get('Omeka\ApiManager')
             ->read($request->getResource(), $request->getId(), [], ['responseContent' => 'resource'])->getContent();
@@ -174,9 +176,27 @@ class Module extends AbstractModule
             }
         }
 
-        if ($toFlush && $event->getParam('request')->getOption('flushEntityManager', true)) {
-            $entityManager->flush();
+        if (!$toFlush) {
+            return;
         }
+
+        $isOldOmeka = version_compare(\Omeka\Module::VERSION, '4', '<');
+
+        /** @var \Omeka\Api\Request $request */
+        $request = $event->getParam('request');
+
+        $flushEntityManager = $request->getOption('flushEntityManager', true);
+
+        if ($isOldOmeka) {
+            if ($flushEntityManager) {
+                $entityManager->flush();
+                return;
+            }
+        }
+
+        // Flush in all cases in Omeka S v4, for background or foreground batch
+        // edit process), because this is in api post.
+        $entityManager->flush();
     }
 
     /**
