@@ -52,7 +52,7 @@ dcterms:relation = dcterms:relation
         $result = [];
         $list = $this->stringToList($string);
         foreach ($list as $keyValue) {
-            list($key, $value) = array_map('trim', explode('=', $keyValue, 2));
+            list($key, $value) = array_map('trim', explode('=', $keyValue, 2)) + ['', ''];
             if ($key !== '') {
                 $result[$key] = $value;
             }
