@@ -301,7 +301,8 @@ class Module extends AbstractModule
             }
         }
 
-        return $isPublicProperties[$resourceTemplateId][$propertyId];
+        return !isset($isPublicProperties[$resourceTemplateId][$propertyId])
+            || $isPublicProperties[$resourceTemplateId][$propertyId];
     }
 
     /**
