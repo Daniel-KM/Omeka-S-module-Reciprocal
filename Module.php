@@ -195,7 +195,7 @@ class Module extends AbstractModule
         }
 
         // Flush in all cases in Omeka S v4, for background or foreground batch
-        // edit process), because this is in api post.
+        // edit process, because this is in api post.
         $entityManager->flush();
     }
 
