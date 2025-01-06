@@ -2,22 +2,29 @@
 
 namespace Reciprocal;
 
-if (!class_exists(\Generic\AbstractModule::class)) {
-    require file_exists(dirname(__DIR__) . '/Generic/AbstractModule.php')
-        ? dirname(__DIR__) . '/Generic/AbstractModule.php'
-        : __DIR__ . '/src/Generic/AbstractModule.php';
+if (!class_exists(\Common\TraitModule::class)) {
+    require_once dirname(__DIR__) . '/Common/TraitModule.php';
 }
 
-use Generic\AbstractModule;
+use Common\TraitModule;
 use Laminas\EventManager\Event;
 use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Entity\Property;
 use Omeka\Entity\Resource;
+use Omeka\Module\AbstractModule;
 use Reciprocal\Form\ConfigForm;
 
+/**
+ * Reciprocal.
+ *
+ * @copyright Daniel Berthereau, 2020-2025
+ * @license http://www.cecill.info/licences/Licence_CeCILL_V2.1-en.txt
+ */
 class Module extends AbstractModule
 {
+    use TraitModule;
+
     const NAMESPACE = __NAMESPACE__;
 
     /**
@@ -29,6 +36,21 @@ class Module extends AbstractModule
      * @var array
      */
     protected $reciprocalValueResourceIds = [];
+
+    protected function preInstall(): void
+    {
+        $services = $this->getServiceLocator();
+        $plugins = $services->get('ControllerPluginManager');
+        $translate = $plugins->get('translate');
+
+        if (!method_exists($this, 'checkModuleActiveVersion') || !$this->checkModuleActiveVersion('Common', '3.4.65')) {
+            $message = new \Omeka\Stdlib\Message(
+                $translate('The module %1$s should be upgraded to version %2$s or later.'), // @translate
+                'Common', '3.4.65'
+            );
+            throw new \Omeka\Module\Exception\ModuleCannotInstallException((string) $message);
+        }
+    }
 
     public function attachListeners(SharedEventManagerInterface $sharedEventManager): void
     {
@@ -62,6 +84,7 @@ class Module extends AbstractModule
 
         $settings = $services->get('Omeka\Settings');
 
+        // TODO See module Guest.
         $this->initDataToPopulate($settings, 'config');
         $data = $this->prepareDataToPopulate($settings, 'config');
         if (is_null($data)) {
@@ -180,19 +203,8 @@ class Module extends AbstractModule
             return;
         }
 
-        $isOldOmeka = version_compare(\Omeka\Module::VERSION, '4', '<');
-
         /** @var \Omeka\Api\Request $request */
         $request = $event->getParam('request');
-
-        $flushEntityManager = $request->getOption('flushEntityManager', true);
-
-        if ($isOldOmeka) {
-            if ($flushEntityManager) {
-                $entityManager->flush();
-                return;
-            }
-        }
 
         // Flush in all cases in Omeka S v4, for background or foreground batch
         // edit process, because this is in api post.
@@ -214,13 +226,17 @@ class Module extends AbstractModule
         // TODO Store this list in a specific setting to avoid to rebuild it each time (keep the original settings too)?
         $this->reciprocityIds = [];
 
-        $reciprocities = $this->getServiceLocator()->get('Omeka\Settings')->get('reciprocal_reciprocities');
+        $services = $this->getServiceLocator();
+        $reciprocities = $services->get('Omeka\Settings')->get('reciprocal_reciprocities');
         if (empty($reciprocities)) {
             return false;
         }
 
-        $propertyIdsByTerms = $this->getPropertyIds();
-        $propertyTermsByIds = array_flip($propertyIdsByTerms);
+        /** @var \Common\Stdlib\EasyMeta $easyMeta */
+        $easyMeta = $services->get('Common\EasyMeta');
+
+        $propertyIdsByTerms = $easyMeta->propertyIds();
+        $propertyTermsByIds = $easyMeta->propertyTerms();
 
         // Manage the case where some properties were removed.
         $reciprocities = array_intersect_key($reciprocities, $propertyIdsByTerms);
@@ -323,27 +339,5 @@ class Module extends AbstractModule
 
         return !isset($isPublicProperties[$resourceTemplateId][$propertyId])
             || $isPublicProperties[$resourceTemplateId][$propertyId];
-    }
-
-    /**
-     * Get list of all property ids by terms.
-     */
-    protected function getPropertyIds(): array
-    {
-        $connection = $this->getServiceLocator()->get('Omeka\Connection');
-        $qb = $connection->createQueryBuilder();
-        $qb
-            ->select(
-                'DISTINCT CONCAT(vocabulary.prefix, ":", property.local_name) AS term',
-                'property.id AS id',
-                // Required with only_full_group_by.
-                'vocabulary.id'
-            )
-            ->from('property', 'property')
-            ->innerJoin('property', 'vocabulary', 'vocabulary', 'property.vocabulary_id = vocabulary.id')
-            ->orderBy('vocabulary.id', 'asc')
-            ->addOrderBy('property.id', 'asc')
-        ;
-        return array_map('intval', $connection->executeQuery($qb)->fetchAllKeyValue());
     }
 }
