@@ -22,14 +22,14 @@ Note that the module [Inverse Properties] has a similar aim, but works different
 Installation
 ------------
 
-This optional module [Generic] may be installed first.
-
 See general end user documentation for [installing a module].
+
+This module requires the module [Common], that should be installed first.
 
 * From the zip
 
-Download the last release [Reciprocal.zip] from the list of releases, and
-uncompress it in the `modules` directory.
+Download the last release [Reciprocal.zip] from the list of releases,
+and uncompress it in the `modules` directory.
 
 * From the source and for development
 
@@ -92,15 +92,15 @@ Copyright
 * Copyright Daniel Berthereau, 2020-2023 (see [Daniel-KM] on GitLab)
 
 These features are built for the future digital library [Manioc] of the
-Université des Antilles and Université de la Guyane, currently managed with
+Université des Antilles and Université de la Guyane, formerly managed with
 [Greenstone].
 
 
 [Reciprocal]: https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal
 [Omeka S]: https://omeka.org/s
 [Inverse Properties]: https://github.com/omeka-s-modules/inverseproperties
-[Installing a module]: https://omeka.org/s/docs/user-manual/modules/#installing-modules
-[Generic]: https://gitlab.com/Daniel-KM/Omeka-S-module-Generic
+[installing a module]: https://omeka.org/s/docs/user-manual/modules/#installing-modules
+[Common]: https://gitlab.com/Daniel-KM/Omeka-S-module-Common
 [Reciprocal.zip]: https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal/-/releases
 [module issues]: https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal/-/issues
 [CeCILL v2.1]: https://www.cecill.info/licences/Licence_CeCILL_V2.1-en.html
