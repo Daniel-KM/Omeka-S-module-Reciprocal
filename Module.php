@@ -131,6 +131,10 @@ class Module extends AbstractModule
         if (!$resource instanceof Resource) {
             return;
         }
+        // Reset state for this resource before recording its current (old)
+        // reciprocal values, so a previous request does not leak into this
+        // one (e.g. CLI / queue jobs running multiple operations in process).
+        unset($this->reciprocalValueResourceIds[$resource->getId()]);
         $this->prepareSpecifiedValuesResources($resource, false);
     }
 
@@ -216,6 +220,10 @@ class Module extends AbstractModule
             }
         }
 
+        // Cleanup state for this resource so subsequent operations on the
+        // same id (CLI / queue jobs) start from a clean slate.
+        unset($this->reciprocalValueResourceIds[$resourceId]);
+
         if (!$toFlush) {
             return;
         }
@@ -288,15 +296,7 @@ class Module extends AbstractModule
      */
     protected function prepareSpecifiedValuesResources(Resource $resource, $isNew): void
     {
-        // Avoid an infinite loop.
-        static $processed = [];
         $resourceId = $resource->getId();
-        if (isset($processed[$resourceId][(int) $isNew])) {
-            return;
-        }
-
-        $processed[$resourceId][(int) $isNew] = true;
-
         if (!isset($this->reciprocalValueResourceIds[$resourceId])) {
             $this->reciprocalValueResourceIds[$resourceId] = [];
         }
