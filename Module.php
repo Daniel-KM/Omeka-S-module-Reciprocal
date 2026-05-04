@@ -116,8 +116,21 @@ class Module extends AbstractModule
 
         /** @var \Omeka\Api\Request $request */
         $request = $event->getParam('request');
-        $resource = $this->getServiceLocator()->get('Omeka\ApiManager')
-            ->read($request->getResource(), $request->getId(), [], ['responseContent' => 'resource'])->getContent();
+        // Fetch the persisted entity directly via the entity manager to avoid
+        // a full api.read event chain (ACL, listeners) on every update.
+        /** @var \Omeka\Api\Adapter\AbstractEntityAdapter $adapter */
+        $adapter = $event->getTarget();
+        $entityClass = $adapter && method_exists($adapter, 'getEntityClass')
+            ? $adapter->getEntityClass()
+            : null;
+        if (!$entityClass) {
+            return;
+        }
+        $entityManager = $this->getServiceLocator()->get('Omeka\EntityManager');
+        $resource = $entityManager->find($entityClass, $request->getId());
+        if (!$resource instanceof Resource) {
+            return;
+        }
         $this->prepareSpecifiedValuesResources($resource, false);
     }
 
@@ -162,37 +175,41 @@ class Module extends AbstractModule
         foreach ($this->reciprocalValueResourceIds[$resourceId] as $propertyId => $reciprocalResources) {
             $reciprocalPropertyId = $this->reciprocityIds[$propertyId];
             $reciprocalProperty = $entityManager->getReference(\Omeka\Entity\Property::class, $reciprocalPropertyId);
-            foreach ($reciprocalResources as $reciprocalResourceId => $isNew) {
+            foreach ($reciprocalResources as $reciprocalResourceId => $entry) {
+                $isNew = (bool) ($entry['isNew'] ?? false);
+                $sourceIsPublic = (bool) ($entry['sourceIsPublic'] ?? true);
                 /** @var \Omeka\Entity\Resource $reciprocalResource */
                 $reciprocalResource = $entityManager->getReference(\Omeka\Entity\Resource::class, $reciprocalResourceId);
-                $reciprocalValues = $reciprocalResource->getValues();
-                $existings = $reciprocalValues->filter(function ($value) use ($resource, $resourceType, $reciprocalPropertyId) {
-                    $type = $value->getType();
-                    return ($type === 'resource' || $type === $resourceType)
-                        && $value->getProperty()->getId() === $reciprocalPropertyId
-                        && $value->getValueResource() === $resource;
-                });
+                $existings = $this->findReciprocalValues(
+                    $entityManager,
+                    $reciprocalResourceId,
+                    $reciprocalPropertyId,
+                    $resource,
+                    $resourceType
+                );
                 if ($isNew) {
                     // Add the resource as a value in the reciprocal property of
                     // the reciprocal resource one time only.
-                    if (!count($existings)) {
+                    if (!$existings) {
                         $toFlush = true;
                         $reciprocalValue = new \Omeka\Entity\Value;
                         $reciprocalValue->setResource($reciprocalResource);
                         $reciprocalValue->setProperty($reciprocalProperty);
                         $reciprocalValue->setType($resourceType);
                         $reciprocalValue->setValueResource($resource);
-                        $reciprocalValue->setIsPublic($this->isPublicProperty($resource, $reciprocalProperty));
-                        $reciprocalValues->add($reciprocalValue);
+                        $reciprocalValue->setIsPublic($this->resolveIsPublic(
+                            $reciprocalResource,
+                            $reciprocalProperty,
+                            $sourceIsPublic
+                        ));
                         $entityManager->persist($reciprocalValue);
                     }
                 }
                 // Remove the resource as a value in the reciprocal property of
                 // the reciprocal resource for all values.
-                elseif (count($existings)) {
+                elseif ($existings) {
                     $toFlush = true;
                     foreach ($existings as $existing) {
-                        $reciprocalValues->removeElement($existing);
                         $entityManager->remove($existing);
                     }
                 }
@@ -206,8 +223,12 @@ class Module extends AbstractModule
         /** @var \Omeka\Api\Request $request */
         $request = $event->getParam('request');
 
-        // Flush in all cases in Omeka S v4, for background or foreground batch
-        // edit process, because this is in api post.
+        // Defer flushing when the request explicitly opts out (batch edit
+        // pipeline). Doctrine will flush new/removed entities once at the end.
+        if ($request && !$request->getOption('flushEntityManager', true)) {
+            return;
+        }
+
         $entityManager->flush();
     }
 
@@ -245,12 +266,18 @@ class Module extends AbstractModule
         // Merge the flipped array to manage all cases one time.
         $reciprocities += array_flip($reciprocities);
 
-        // Use ids to quick process.
-        $this->reciprocityIds = array_combine(
-            array_replace($reciprocities, array_intersect_key($propertyIdsByTerms, $reciprocities)),
-            array_replace(array_flip($reciprocities), array_intersect_key($propertyIdsByTerms, array_flip($reciprocities)))
-        );
-        return true;
+        // Translate term pairs to id pairs without relying on array_combine,
+        // which throws on size mismatch when terms could not be resolved.
+        $idPairs = [];
+        foreach ($reciprocities as $term => $reciprocalTerm) {
+            $id = $propertyIdsByTerms[$term] ?? null;
+            $reciprocalId = $propertyIdsByTerms[$reciprocalTerm] ?? null;
+            if ($id && $reciprocalId) {
+                $idPairs[$id] = $reciprocalId;
+            }
+        }
+        $this->reciprocityIds = $idPairs;
+        return !empty($this->reciprocityIds);
     }
 
     /**
@@ -309,35 +336,77 @@ class Module extends AbstractModule
                 continue;
             }
             // The reciprocal resource id allows to manage duplicate values.
-            // Process is true (new value resource to append) or false (old
-            // value resource to delete).
             // The reciprocal resource cannot be stored here, because an issue
-            // may occur with entity manager flush/clear.
-            $this->reciprocalValueResourceIds[$resourceId][$propertyId][$reciprocalResource->getId()] = $isNew;
+            // may occur with entity manager flush/clear. Keep the source value
+            // visibility so the reciprocal value can inherit it when the
+            // reciprocal template does not declare the property.
+            $this->reciprocalValueResourceIds[$resourceId][$propertyId][$reciprocalResource->getId()] = [
+                'isNew' => $isNew,
+                'sourceIsPublic' => (bool) $value->getIsPublic(),
+            ];
         }
     }
 
-    protected function isPublicProperty(Resource $resource, Property $property)
-    {
-        static $isPublicProperties = [];
+    /**
+     * Fetch existing reciprocal values via a targeted DQL query.
+     *
+     * @return \Omeka\Entity\Value[]
+     */
+    protected function findReciprocalValues(
+        \Doctrine\ORM\EntityManagerInterface $entityManager,
+        int $reciprocalResourceId,
+        int $reciprocalPropertyId,
+        Resource $sourceResource,
+        string $sourceResourceType
+    ): array {
+        $dql = <<<'DQL'
+            SELECT v FROM Omeka\Entity\Value v
+            WHERE IDENTITY(v.resource) = :reciprocalResource
+                AND IDENTITY(v.property) = :reciprocalProperty
+                AND IDENTITY(v.valueResource) = :sourceResource
+                AND v.type IN (:types)
+        DQL;
+        return $entityManager->createQuery($dql)
+            ->setParameter('reciprocalResource', $reciprocalResourceId)
+            ->setParameter('reciprocalProperty', $reciprocalPropertyId)
+            ->setParameter('sourceResource', $sourceResource->getId())
+            ->setParameter('types', ['resource', $sourceResourceType])
+            ->getResult();
+    }
 
-        $resourceTemplate = $resource->getResourceTemplate();
+    /**
+     * Resolve the visibility of a reciprocal value.
+     *
+     * The reciprocal resource template, when it declares the reciprocal
+     * property, drives visibility. When it does not, inherit the source
+     * value's visibility so a private source does not leak as a public
+     * reciprocal.
+     */
+    protected function resolveIsPublic(
+        Resource $reciprocalResource,
+        Property $reciprocalProperty,
+        bool $sourceIsPublic
+    ): bool {
+        static $cache = [];
+
+        $resourceTemplate = $reciprocalResource->getResourceTemplate();
         if (!$resourceTemplate) {
-            return true;
+            return $sourceIsPublic;
         }
 
         $resourceTemplateId = $resourceTemplate->getId();
-        $propertyId = $property->getId();
-        if (!isset($isPublicProperties[$resourceTemplateId][$propertyId])) {
+        $propertyId = $reciprocalProperty->getId();
+        if (!array_key_exists($propertyId, $cache[$resourceTemplateId] ?? [])) {
+            $cache[$resourceTemplateId][$propertyId] = null;
             foreach ($resourceTemplate->getResourceTemplateProperties() as $resourceTemplateProperty) {
                 if ($resourceTemplateProperty->getProperty()->getId() === $propertyId) {
-                    $isPublicProperties[$resourceTemplateId][$propertyId] = !$resourceTemplateProperty->getIsPrivate();
+                    $cache[$resourceTemplateId][$propertyId] = !$resourceTemplateProperty->getIsPrivate();
                     break;
                 }
             }
         }
 
-        return !isset($isPublicProperties[$resourceTemplateId][$propertyId])
-            || $isPublicProperties[$resourceTemplateId][$propertyId];
+        $templateIsPublic = $cache[$resourceTemplateId][$propertyId];
+        return $templateIsPublic ?? $sourceIsPublic;
     }
 }
