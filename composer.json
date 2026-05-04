@@ -1,0 +1,41 @@
+{
+    "name": "daniel-km/omeka-s-module-reciprocal",
+    "type": "omeka-s-module",
+    "description": "Module for Omeka S: Automatically add the reciprocal value in the reciprocal property of a linked resource\".",
+    "keywords": [
+        "Omeka S",
+        "Omeka S module",
+        "semantic",
+        "relations"
+    ],
+    "license": "CECILL-2.1",
+    "homepage": "https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal",
+    "authors": [
+        {
+            "name": "Daniel Berthereau",
+            "email": "Daniel.packagist@Berthereau.net"
+        }
+    ],
+    "support": {
+        "issues": "https://gitlab.com/Daniel-KM/Omeka-S-module-Reciprocal/-/issues",
+        "forum": "https://forum.omeka.org/"
+    },
+    "_require (not set until Omeka S merges PR #2432)": {
+        "omeka/omeka-s": "^4.0",
+        "daniel-km/omeka-s-module-common": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Reciprocal\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ReciprocalTest\\": "tests/ReciprocalTest/"
+        }
+    },
+    "extra": {
+        "installer-name": "Reciprocal",
+        "configurable": true
+    }
+}
