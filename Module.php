@@ -28,6 +28,15 @@ class Module extends AbstractModule
     const NAMESPACE = __NAMESPACE__;
 
     /**
+     * Map of resource name to value type "resource:xxx".
+     */
+    const RESOURCE_TYPES = [
+        'items' => 'resource:item',
+        'item_sets' => 'resource:itemset',
+        'media' => 'resource:media',
+    ];
+
+    /**
      * @var array|null
      */
     protected $reciprocityIds;
@@ -160,17 +169,13 @@ class Module extends AbstractModule
          */
         $services = $this->getServiceLocator();
         $entityManager = $services->get('Omeka\EntityManager');
-        $resourceTypes = [
-            // "Resource" is used to simplify checks.
-            'resource' => 'resource',
-            'items' => 'resource:item',
-            'item_sets' => 'resource:itemset',
-            'media' => 'resource:media',
-        ];
 
         $resource = $event->getParam('response')->getContent();
         $resourceName = $resource->getResourceName();
-        $resourceType = $resourceTypes[$resourceName];
+        $resourceType = self::RESOURCE_TYPES[$resourceName] ?? null;
+        if (!$resourceType) {
+            return;
+        }
         $resourceId = $resource->getId();
 
         $this->prepareSpecifiedValuesResources($resource, true);
@@ -310,17 +315,14 @@ class Module extends AbstractModule
         $acl = $services->get('Omeka\Acl');
         $user = $services->get('Omeka\AuthenticationService')->getIdentity();
 
-        $resourceTypes = [
-            // "Resource" is used to simplify checks.
+        $valueResourceTypes = self::RESOURCE_TYPES + [
+            'resource' => 'resource',
             'resources' => 'resource',
-            'items' => 'resource:item',
-            'item_sets' => 'resource:itemset',
-            'media' => 'resource:media',
         ];
 
         foreach ($resource->getValues() as $value) {
             $type = $value->getType();
-            if (!in_array($type, $resourceTypes)) {
+            if (!in_array($type, $valueResourceTypes, true)) {
                 continue;
             }
             $propertyId = $value->getProperty()->getId();
