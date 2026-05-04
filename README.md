@@ -36,6 +36,15 @@ and uncompress it in the `modules` directory.
 If the module was installed from the source, rename the name of the folder of
 the module to `Reciprocal`.
 
+* For test
+
+The module includes a comprehensive test suite with unit and functional tests.
+Run them from the root of Omeka:
+
+```sh
+vendor/bin/phpunit -c modules/Reciprocal/phpunit.xml --testdox
+```
+
 
 Usage
 -----
@@ -89,7 +98,7 @@ altered, and that no provisions are either added or removed herefrom.
 Copyright
 ---------
 
-* Copyright Daniel Berthereau, 2020-2023 (see [Daniel-KM] on GitLab)
+* Copyright Daniel Berthereau, 2020-2026 (see [Daniel-KM] on GitLab)
 
 These features are built for the future digital library [Manioc] of the
 Université des Antilles and Université de la Guyane, formerly managed with
